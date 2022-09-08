@@ -70,8 +70,6 @@ function Input() {
   labelElement.append("Enter Repo Name :");
   labelElement.append(inputElement);
 
-  console.log(Root.state.cursorPosition);
-
   return labelElement;
 }
 
