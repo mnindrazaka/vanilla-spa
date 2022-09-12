@@ -11,18 +11,63 @@ const Root = {
       if (nextState.inputValue === "") {
         this.setState({ items: [] });
       } else {
-        this.setState({ loading: true });
+        this.send({ type: "FETCH" });
         fetch(
           `https://api.github.com/search/repositories?q=${this.state.inputValue}`
         )
           .then((res) => res.json())
-          .then((res) => this.setState({ items: res.items, error: null }))
-          .catch(() =>
-            this.setState({ items: [], error: "Something went wrong" })
+          .then((res) =>
+            this.send({ type: "FETCH_SUCCESS", payload: { items: res.items } })
           )
-          .finally(() => this.setState({ loading: false }));
+          .catch(() =>
+            this.send({
+              type: "FETCH_ERROR",
+              payload: { error: "Something went wrong" },
+            })
+          );
       }
     }
+  },
+
+  reducer(prevState, action) {
+    switch (action.type) {
+      case "FETCH": {
+        return {
+          ...prevState,
+          loading: true,
+        };
+      }
+      case "FETCH_SUCCESS": {
+        return {
+          ...prevState,
+          error: null,
+          items: action.payload.items,
+          loading: false,
+        };
+      }
+      case "FETCH_ERROR": {
+        return {
+          ...prevState,
+          error: action.payload.error,
+          items: [],
+          loading: false,
+        };
+      }
+      case "CHANGE_INPUT": {
+        return {
+          ...prevState,
+          inputValue: action.payload.inputValue,
+        };
+      }
+      default: {
+        return prevState;
+      }
+    }
+  },
+
+  send(action) {
+    const newState = this.reducer(this.state, action);
+    this.setState(newState);
   },
 
   setState(newState) {
@@ -57,7 +102,10 @@ const Root = {
 
 function Input() {
   const handleInput = (event) => {
-    Root.setState({ inputValue: event.target.value });
+    Root.send({
+      type: "CHANGE_INPUT",
+      payload: { inputValue: event.target.value },
+    });
   };
 
   const inputElement = document.createElement("input");
