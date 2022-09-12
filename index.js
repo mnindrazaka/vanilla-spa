@@ -1,63 +1,118 @@
 const Root = {
   state: {
+    tag: "empty",
     items: [],
     inputValue: "",
     error: null,
-    loading: false,
   },
 
   didUpdate(prevState, nextState) {
-    if (prevState.inputValue !== nextState.inputValue) {
-      if (nextState.inputValue === "") {
-        this.setState({ items: [] });
-      } else {
-        this.send({ type: "FETCH" });
-        fetch(
-          `https://api.github.com/search/repositories?q=${this.state.inputValue}`
-        )
-          .then((res) => res.json())
-          .then((res) =>
-            this.send({ type: "FETCH_SUCCESS", payload: { items: res.items } })
+    switch (nextState.tag) {
+      case "loading": {
+        if (nextState.inputValue === "") {
+          this.send({ type: "FETCH_EMPTY" });
+        } else {
+          fetch(
+            `https://api.github.com/search/repositories?q=${this.state.inputValue}`
           )
-          .catch(() =>
-            this.send({
-              type: "FETCH_ERROR",
-              payload: { error: "Something went wrong" },
+            .then((res) => res.json())
+            .then((res) => {
+              if (res.items.length > 0) {
+                this.send({
+                  type: "FETCH_SUCCESS",
+                  payload: { items: res.items },
+                });
+              } else {
+                this.send({ type: "FETCH_EMPTY" });
+              }
             })
-          );
+            .catch(() =>
+              this.send({
+                type: "FETCH_ERROR",
+                payload: { error: "Something went wrong" },
+              })
+            );
+        }
+      }
+      case "empty":
+      case "loaded":
+      case "error":
+      default: {
       }
     }
   },
 
   reducer(prevState, action) {
-    switch (action.type) {
-      case "FETCH": {
-        return {
-          ...prevState,
-          loading: true,
-        };
+    switch (prevState.tag) {
+      case "empty": {
+        switch (action.type) {
+          case "CHANGE_INPUT":
+            return {
+              ...prevState,
+              tag: "loading",
+              inputValue: action.payload.inputValue,
+            };
+          default:
+            return prevState;
+        }
       }
-      case "FETCH_SUCCESS": {
-        return {
-          ...prevState,
-          error: null,
-          items: action.payload.items,
-          loading: false,
-        };
+      case "loaded": {
+        switch (action.type) {
+          case "CHANGE_INPUT":
+            return {
+              ...prevState,
+              tag: "loading",
+              inputValue: action.payload.inputValue,
+            };
+          default:
+            return prevState;
+        }
       }
-      case "FETCH_ERROR": {
-        return {
-          ...prevState,
-          error: action.payload.error,
-          items: [],
-          loading: false,
-        };
+      case "loading": {
+        switch (action.type) {
+          case "FETCH_EMPTY": {
+            return {
+              ...prevState,
+              tag: "empty",
+              items: [],
+              error: null,
+            };
+          }
+          case "FETCH_SUCCESS":
+            return {
+              ...prevState,
+              tag: "loaded",
+              items: action.payload.items,
+              error: null,
+            };
+          case "FETCH_ERROR":
+            return {
+              ...prevState,
+              tag: "error",
+              items: [],
+              error: action.payload.error,
+            };
+          case "CHANGE_INPUT":
+            return {
+              ...prevState,
+              tag: "loading",
+              inputValue: action.payload.inputValue,
+            };
+          default:
+            return prevState;
+        }
       }
-      case "CHANGE_INPUT": {
-        return {
-          ...prevState,
-          inputValue: action.payload.inputValue,
-        };
+      case "error": {
+        switch (action.type) {
+          case "CHANGE_INPUT":
+            return {
+              ...prevState,
+              tag: "loading",
+              inputValue: action.payload.inputValue,
+            };
+          default:
+            return prevState;
+        }
       }
       default: {
         return prevState;
@@ -151,22 +206,40 @@ function EmptyItems() {
   return paragraphElement;
 }
 
+function ErrorView() {
+  const paragraphElement = document.createElement("p");
+  paragraphElement.textContent = Root.state.error;
+  return paragraphElement;
+}
+
 function App() {
   const input = Input();
   const text = TextPreview();
   const items = Items();
   const emptyItems = EmptyItems();
+  const errorView = ErrorView();
   const loading = Loading();
   const container = document.createElement("div");
   container.append(input);
   container.append(text);
-  container.append(
-    Root.state.loading
-      ? loading
-      : Root.state.items.length > 0
-      ? items
-      : emptyItems
-  );
+
+  switch (Root.state.tag) {
+    case "loading":
+      container.append(loading);
+      break;
+    case "loaded":
+      container.append(items);
+      break;
+    case "empty":
+      container.append(emptyItems);
+      break;
+    case "error":
+      container.append(errorView);
+      break;
+    default: {
+    }
+  }
+
   return container;
 }
 
